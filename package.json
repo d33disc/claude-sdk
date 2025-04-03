@@ -1,0 +1,25 @@
+{
+  "name": "claude-sdk",
+  "version": "1.0.0",
+  "description": "A comprehensive Python SDK for interacting with Anthropic's Claude AI models, including Claude 3 Opus, Sonnet, Haiku, and Claude 3.5/3.7.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "example": "examples",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/d33disc/claude-sdk.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/d33disc/claude-sdk/issues"
+  },
+  "homepage": "https://github.com/d33disc/claude-sdk#readme"
+}

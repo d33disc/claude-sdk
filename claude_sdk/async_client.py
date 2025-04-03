@@ -1,11 +1,14 @@
 """
-Asynchronous Claude client for interacting with Anthropic's Claude AI models.
+Asynchronous client for interacting with Anthropic's Claude AI models.
 """
 
 import os
-import aiohttp
 import json
+import aiohttp
 from typing import Dict, List, Optional, Union, Any, AsyncGenerator
+
+from .exceptions import handle_api_error
+from .utils import validate_api_key
 
 class AsyncClaude:
     """
@@ -22,11 +25,7 @@ class AsyncClaude:
         api_key: Optional[str] = None,
         base_url: str = "https://api.anthropic.com",
     ):
-        self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-        if not self.api_key:
-            raise ValueError(
-                "API key must be provided either as an argument or through the ANTHROPIC_API_KEY environment variable."
-            )
+        self.api_key = validate_api_key(api_key)
         self.base_url = base_url
         self.headers = {
             "x-api-key": self.api_key,
@@ -45,7 +44,7 @@ class AsyncClaude:
         tools: Optional[List[Dict[str, Any]]] = None,
     ) -> Union[Dict[str, Any], AsyncGenerator[str, None]]:
         """
-        Generate a response from Claude asynchronously.
+        Asynchronously generate a response from Claude.
         
         Args:
             model (str): The Claude model to use (e.g., "claude-3-7-sonnet-20250219").
@@ -57,7 +56,8 @@ class AsyncClaude:
             tools (List[Dict[str, Any]], optional): List of tools for Claude to use.
             
         Returns:
-            Union[Dict[str, Any], AsyncGenerator[str, None]]: Response from Claude.
+            Union[Dict[str, Any], AsyncGenerator[str, None]]: Response from Claude or a generator
+                that yields streamed responses.
         """
         messages = [{"role": "user", "content": prompt}]
         
@@ -80,31 +80,37 @@ class AsyncClaude:
             if stream:
                 payload["stream"] = True
                 async with session.post(endpoint, json=payload, headers=self.headers) as response:
-                    response.raise_for_status()
+                    if response.status >= 400:
+                        error_data = await response.json()
+                        handle_api_error(response.status, error_data)
+                    
                     return self._handle_streaming_response(response)
             else:
                 async with session.post(endpoint, json=payload, headers=self.headers) as response:
-                    response.raise_for_status()
-                    return await response.json()
+                    response_data = await response.json()
+                    
+                    if response.status >= 400:
+                        handle_api_error(response.status, response_data)
+                        
+                    return response_data
     
-    async def _handle_streaming_response(self, response):
+    async def _handle_streaming_response(self, response: aiohttp.ClientResponse) -> AsyncGenerator[str, None]:
         """
-        Handle streaming response from Claude asynchronously.
+        Handle streaming response from Claude.
         
         Args:
             response: Streaming response from aiohttp.
             
-        Returns:
-            AsyncGenerator yielding response chunks.
+        Yields:
+            str: Response chunks.
         """
         async for line in response.content:
             line = line.decode("utf-8").strip()
-            if line:
-                if line.startswith("data: "):
-                    data = line[6:]  # Remove "data: " prefix
-                    if data != "[DONE]":
-                        yield data
-                        
+            if line.startswith("data: "):
+                data = line[6:]  # Remove "data: " prefix
+                if data != "[DONE]":
+                    yield data
+                    
     async def messages_create(
         self,
         model: str,
@@ -116,7 +122,7 @@ class AsyncClaude:
         stream: bool = False,
     ) -> Union[Dict[str, Any], AsyncGenerator[str, None]]:
         """
-        Create a message using the Claude API asynchronously.
+        Asynchronously create a message using the Claude API.
         
         This method is compatible with the official Anthropic API format.
         
@@ -130,7 +136,8 @@ class AsyncClaude:
             stream (bool, optional): Whether to stream the response.
             
         Returns:
-            Union[Dict[str, Any], AsyncGenerator[str, None]]: Response from Claude.
+            Union[Dict[str, Any], AsyncGenerator[str, None]]: Response from Claude or a generator
+                that yields streamed responses.
         """
         payload = {
             "model": model,
@@ -151,50 +158,16 @@ class AsyncClaude:
             if stream:
                 payload["stream"] = True
                 async with session.post(endpoint, json=payload, headers=self.headers) as response:
-                    response.raise_for_status()
+                    if response.status >= 400:
+                        error_data = await response.json()
+                        handle_api_error(response.status, error_data)
+                    
                     return self._handle_streaming_response(response)
             else:
                 async with session.post(endpoint, json=payload, headers=self.headers) as response:
-                    response.raise_for_status()
-                    return await response.json()
+                    response_data = await response.json()
                     
-    async def compute_use(
-        self,
-        model: str,
-        prompt: str,
-        max_tokens: int = 1000,
-        temperature: float = 0.7,
-        system_prompt: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """
-        Use Claude's computer use feature to perform desktop automation asynchronously.
-        
-        Args:
-            model (str): The Claude model to use (must support computer use).
-            prompt (str): The user prompt instructing Claude what to do.
-            max_tokens (int, optional): Maximum number of tokens to generate.
-            temperature (float, optional): Sampling temperature.
-            system_prompt (str, optional): System prompt to guide Claude's behavior.
-            
-        Returns:
-            Dict[str, Any]: Response from Claude.
-        """
-        messages = [{"role": "user", "content": prompt}]
-        
-        payload = {
-            "model": model,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "temperature": temperature,
-            "computer_use": True,
-        }
-        
-        if system_prompt:
-            payload["system"] = system_prompt
-            
-        endpoint = f"{self.base_url}/v1/messages"
-        
-        async with aiohttp.ClientSession() as session:
-            async with session.post(endpoint, json=payload, headers=self.headers) as response:
-                response.raise_for_status()
-                return await response.json()
+                    if response.status >= 400:
+                        handle_api_error(response.status, response_data)
+                        
+                    return response_data

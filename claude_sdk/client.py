@@ -3,8 +3,12 @@ Claude client for interacting with Anthropic's Claude AI models.
 """
 
 import os
+import json
 import requests
-from typing import Dict, List, Optional, Union, Any
+from typing import Dict, List, Optional, Union, Any, Generator
+
+from .exceptions import handle_api_error
+from .utils import validate_api_key
 
 class Claude:
     """
@@ -21,11 +25,7 @@ class Claude:
         api_key: Optional[str] = None,
         base_url: str = "https://api.anthropic.com",
     ):
-        self.api_key = api_key or os.environ.get("ANTHROPIC_API_KEY")
-        if not self.api_key:
-            raise ValueError(
-                "API key must be provided either as an argument or through the ANTHROPIC_API_KEY environment variable."
-            )
+        self.api_key = validate_api_key(api_key)
         self.base_url = base_url
         self.headers = {
             "x-api-key": self.api_key,
@@ -42,7 +42,7 @@ class Claude:
         system_prompt: Optional[str] = None,
         stream: bool = False,
         tools: Optional[List[Dict[str, Any]]] = None,
-    ) -> Dict[str, Any]:
+    ) -> Union[Dict[str, Any], Generator[str, None, None]]:
         """
         Generate a response from Claude.
         
@@ -56,7 +56,8 @@ class Claude:
             tools (List[Dict[str, Any]], optional): List of tools for Claude to use.
             
         Returns:
-            Dict[str, Any]: Response from Claude.
+            Union[Dict[str, Any], Generator[str, None, None]]: Response from Claude or a generator
+                that yields streamed responses.
         """
         messages = [{"role": "user", "content": prompt}]
         
@@ -78,22 +79,30 @@ class Claude:
         if stream:
             payload["stream"] = True
             response = requests.post(endpoint, json=payload, headers=self.headers, stream=True)
-            response.raise_for_status()
+            
+            if response.status_code >= 400:
+                error_data = response.json()
+                handle_api_error(response.status_code, error_data)
+                
             return self._handle_streaming_response(response)
         else:
             response = requests.post(endpoint, json=payload, headers=self.headers)
-            response.raise_for_status()
-            return response.json()
+            response_data = response.json()
+            
+            if response.status_code >= 400:
+                handle_api_error(response.status_code, response_data)
+                
+            return response_data
     
-    def _handle_streaming_response(self, response):
+    def _handle_streaming_response(self, response) -> Generator[str, None, None]:
         """
         Handle streaming response from Claude.
         
         Args:
             response: Streaming response from requests.
             
-        Returns:
-            Generator yielding response chunks.
+        Yields:
+            str: Response chunks.
         """
         for line in response.iter_lines():
             if line:
@@ -112,7 +121,7 @@ class Claude:
         system: Optional[str] = None,
         tools: Optional[List[Dict[str, Any]]] = None,
         stream: bool = False,
-    ) -> Dict[str, Any]:
+    ) -> Union[Dict[str, Any], Generator[str, None, None]]:
         """
         Create a message using the Claude API.
         
@@ -128,7 +137,8 @@ class Claude:
             stream (bool, optional): Whether to stream the response.
             
         Returns:
-            Dict[str, Any]: Response from Claude.
+            Union[Dict[str, Any], Generator[str, None, None]]: Response from Claude or a generator
+                that yields streamed responses.
         """
         payload = {
             "model": model,
@@ -148,12 +158,20 @@ class Claude:
         if stream:
             payload["stream"] = True
             response = requests.post(endpoint, json=payload, headers=self.headers, stream=True)
-            response.raise_for_status()
+            
+            if response.status_code >= 400:
+                error_data = response.json()
+                handle_api_error(response.status_code, error_data)
+                
             return self._handle_streaming_response(response)
         else:
             response = requests.post(endpoint, json=payload, headers=self.headers)
-            response.raise_for_status()
-            return response.json()
+            response_data = response.json()
+            
+            if response.status_code >= 400:
+                handle_api_error(response.status_code, response_data)
+                
+            return response_data
             
     def compute_use(
         self,
@@ -191,5 +209,9 @@ class Claude:
             
         endpoint = f"{self.base_url}/v1/messages"
         response = requests.post(endpoint, json=payload, headers=self.headers)
-        response.raise_for_status()
-        return response.json()
+        response_data = response.json()
+        
+        if response.status_code >= 400:
+            handle_api_error(response.status_code, response_data)
+            
+        return response_data
