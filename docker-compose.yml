@@ -1,0 +1,27 @@
+version: '3'
+
+services:
+  claude-sdk:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    volumes:
+      - ./claude_sdk:/app/claude_sdk
+    restart: unless-stopped
+
+  # Claude Computer Use service (if needed)
+  computer-use:
+    image: ghcr.io/anthropics/anthropic-quickstarts:computer-use-demo-latest
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+    ports:
+      - "5900:5900"  # VNC
+      - "8501:8501"  # Streamlit
+      - "6080:6080"  # noVNC
+      - "8080:8080"  # Web UI
+    volumes:
+      - ~/.anthropic:/home/computeruse/.anthropic
