@@ -1,0 +1,50 @@
+name: GitHub Actions Connectivity Test
+
+on:
+  workflow_dispatch:  # Manual trigger only for testing
+
+jobs:
+  connectivity-test:
+    runs-on: self-hosted
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+    
+    - name: Test GitHub connectivity
+      run: |
+        echo "Testing GitHub connectivity..."
+        echo "Runner name: $RUNNER_NAME"
+        echo "Runner OS: $RUNNER_OS"
+        echo "GitHub repository: $GITHUB_REPOSITORY"
+        echo "GitHub server URL: $GITHUB_SERVER_URL"
+        echo "GitHub API URL: $GITHUB_API_URL"
+        
+        # Test connection to GitHub domains
+        echo "Testing connection to GitHub domains..."
+        if python3 -c "import urllib.request; urllib.request.urlopen('https://github.com')"; then
+          echo "✅ Connection to github.com successful"
+        else
+          echo "❌ Connection to github.com failed"
+        fi
+        
+        if python3 -c "import urllib.request; urllib.request.urlopen('https://api.github.com')"; then
+          echo "✅ Connection to api.github.com successful"
+        else
+          echo "❌ Connection to api.github.com failed"
+        fi
+    
+    - name: List environment info
+      run: |
+        echo "System information:"
+        uname -a
+        python3 --version
+        
+        echo "Network information:"
+        # Get network interfaces, excluding localhost
+        ifconfig | grep -v 127.0.0.1 || ipconfig
+        
+        echo "DNS resolution test:"
+        nslookup github.com || echo "nslookup not available"
+        
+        echo "Connectivity test completed!"
