@@ -2,21 +2,22 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Copy the package files
-COPY claude_sdk ./claude_sdk
-COPY setup.py README.md ./
+# Install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the application code
+COPY . .
 
 # Install the package
-RUN pip install -e .
+RUN pip install --no-cache-dir -e .
 
-# Install additional dependencies
-RUN pip install uvicorn fastapi
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONIOENCODING=UTF-8
 
-# Copy the API server code
-COPY api_server.py ./
-
-# Expose the API server port
+# Expose API port
 EXPOSE 8000
 
-# Start the API server
-CMD ["uvicorn", "api_server:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application
+CMD ["python", "api_server.py"]
