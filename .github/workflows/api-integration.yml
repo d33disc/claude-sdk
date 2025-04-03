@@ -1,0 +1,176 @@
+name: API Integration Workflow
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 1'  # Run weekly on Mondays
+
+env:
+  NODE_VERSION: '18'
+  # Do NOT put actual tokens here - use GitHub Secrets
+
+jobs:
+  github-api-integration:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: GitHub REST API Integration
+        env:
+          # Access token stored as a repository secret
+          GITHUB_TOKEN: ${{ secrets.API_TOKEN }}
+        run: |
+          echo "Fetching repository data from GitHub API..."
+          # Example of using GitHub REST API with authentication
+          curl -s -H "Authorization: token $GITHUB_TOKEN" \
+               -H "Accept: application/vnd.github.v3+json" \
+               https://api.github.com/repos/${{ github.repository }}
+          
+          # Fetch open issues
+          curl -s -H "Authorization: token $GITHUB_TOKEN" \
+               -H "Accept: application/vnd.github.v3+json" \
+               https://api.github.com/repos/${{ github.repository }}/issues?state=open
+          
+          # Fetch release information
+          curl -s -H "Authorization: token $GITHUB_TOKEN" \
+               -H "Accept: application/vnd.github.v3+json" \
+               https://api.github.com/repos/${{ github.repository }}/releases
+
+  npm-registry-integration:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          registry-url: 'https://registry.npmjs.org'
+      
+      - name: NPM Registry API Integration
+        env:
+          # NPM token stored as a repository secret
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "Fetching package information from NPM Registry..."
+          # Example of using NPM Registry API with authentication
+          # Replace 'your-package-name' with actual package name
+          curl -s -H "Authorization: Bearer $NODE_AUTH_TOKEN" \
+               https://registry.npmjs.org/your-package-name
+          
+          # View package download counts
+          curl -s https://api.npmjs.org/downloads/point/last-month/your-package-name
+
+  documentation-integration:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      
+      - name: Documentation API Integration
+        env:
+          # Documentation API token stored as a repository secret
+          DOCS_API_TOKEN: ${{ secrets.DOCS_API_TOKEN }}
+        run: |
+          echo "Updating documentation via API..."
+          # Example of API call to update documentation
+          # Replace with actual documentation platform API
+          curl -X POST -H "Authorization: Bearer $DOCS_API_TOKEN" \
+               -H "Content-Type: application/json" \
+               -d '{"version": "${{ github.ref_name }}", "content": "Auto-updated from CI"}' \
+               https://docs-platform.example.com/api/update
+
+  ci-cd-platform-integration:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: CI/CD Platform API Integration
+        env:
+          # CI/CD platform API token stored as a repository secret
+          CICD_API_TOKEN: ${{ secrets.CICD_API_TOKEN }}
+        run: |
+          echo "Triggering external CI/CD pipeline..."
+          # Example of API call to external CI/CD platform
+          curl -X POST -H "Authorization: Bearer $CICD_API_TOKEN" \
+               -H "Content-Type: application/json" \
+               -d '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}' \
+               https://ci-platform.example.com/api/trigger-build
+
+  monitoring-integration:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Monitoring API Integration
+        env:
+          # Monitoring platform API token stored as a repository secret
+          MONITORING_API_TOKEN: ${{ secrets.MONITORING_API_TOKEN }}
+        run: |
+          echo "Sending metrics to monitoring platform..."
+          # Example of API call to monitoring platform
+          curl -X POST -H "Authorization: Bearer $MONITORING_API_TOKEN" \
+               -H "Content-Type: application/json" \
+               -d '{"build": "${{ github.run_id }}", "status": "success"}' \
+               https://monitoring-platform.example.com/api/metrics
+
+  security-scanning-integration:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Security Scanning API Integration
+        env:
+          # Security scanning platform API token stored as a repository secret
+          SECURITY_API_TOKEN: ${{ secrets.SECURITY_API_TOKEN }}
+        run: |
+          echo "Triggering security scan..."
+          # Example of API call to security scanning platform
+          curl -X POST -H "Authorization: Bearer $SECURITY_API_TOKEN" \
+               -H "Content-Type: application/json" \
+               -d '{"repo": "${{ github.repository }}", "branch": "${{ github.ref_name }}"}' \
+               https://security-scanner.example.com/api/scan
+
+# Security best practices for API tokens in GitHub Actions:
+#
+# 1. NEVER hardcode tokens in workflow files
+#    - Always use GitHub Secrets to store tokens
+#    - Reference tokens using ${{ secrets.TOKEN_NAME }} syntax
+#
+# 2. Ensure network connectivity to essential domains:
+#    - github.com
+#    - api.github.com
+#    - *.actions.githubusercontent.com
+#
+# 2. Use limited-scope tokens
+#    - Create tokens with the minimum permissions needed
+#    - For GitHub tokens, use fine-grained personal access tokens
+#
+# 3. Rotate tokens regularly
+#    - Set up a reminder to update tokens every 30-90 days
+#    - Update the corresponding GitHub Secret when a token is rotated
+#
+# 4. Use environment protection rules
+#    - Set up environment protection for production deployments
+#    - Add required reviewers for sensitive environments
+#
+# 5. Audit token usage
+#    - Monitor API rate limiting in your logs
+#    - Check for unauthorized access attempts
+#
+# 6. Set token expiration
+#    - Use tokens that automatically expire when possible
+#    - GitHub personal access tokens can have expiration dates
+#
+# 7. Avoid printing tokens
+#    - Set secrets.* values to be automatically masked in logs
+#    - Be careful not to print token values in debug information
