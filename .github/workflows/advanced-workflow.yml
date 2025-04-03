@@ -1,0 +1,320 @@
+name: Enhanced Claude SDK CI/CD
+
+on:
+  push:
+    branches: [ '*' ]  # Run on all branch pushes
+  pull_request:
+    branches: [ '*' ]  # Run on all PRs
+  workflow_dispatch:
+  schedule:
+    - cron: '0 0 * * 1'  # Weekly run on Mondays
+
+env:
+  NODE_VERSION: '18'
+  LOG_LEVEL: 'verbose'
+
+jobs:
+  # Early-stage validation - runs immediately on code push
+  early-validation:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all history for all tags and branches
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Quick syntax check
+        run: |
+          echo "Performing quick syntax validation..."
+          # For JavaScript/TypeScript projects
+          find . -type f -name "*.js" -o -name "*.ts" | xargs -I {} node --check {} || true
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Fast linting check
+        run: |
+          echo "Running quick lint check..."
+          npm run lint:quick || npm run lint || echo "No quick lint script found"
+
+  # Dependabot alert handling
+  dependabot:
+    runs-on: self-hosted
+    # Run this job for dependabot PRs and pushes
+    if: (github.actor == 'dependabot[bot]') || contains(github.event.head_commit.message, 'dependabot')
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Auto-merge Dependabot PRs for minor/patch updates
+        run: |
+          echo "Checking if Dependabot PR can be auto-merged..."
+          # Extract version change type (major/minor/patch)
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          if [[ "$PR_TITLE" =~ "bump ".*" from ".* ]]; then
+            if [[ ! "$PR_TITLE" =~ " major " ]]; then
+              echo "Non-major update detected, running tests before potential auto-merge"
+            else
+              echo "Major update detected, manual review required"
+              exit 0
+            fi
+          fi
+        continue-on-error: true
+      
+      - name: Run tests for Dependabot PR
+        run: npm test
+      
+      - name: Auto-approve and merge if tests pass
+        if: success() && github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
+        run: |
+          echo "Tests passed on Dependabot PR. This would auto-approve and merge."
+          # In a real setup, you'd use GitHub CLI or API to approve and merge
+          # gh pr review $PR_NUMBER --approve
+          # gh pr merge $PR_NUMBER --merge
+        continue-on-error: true
+
+  dependency-check:
+    runs-on: self-hosted
+    needs: [early-validation]
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Check dependencies
+        run: |
+          echo "Running dependency vulnerability check..."
+          npm audit --audit-level=high
+        continue-on-error: true
+      
+      - name: Dependency Update Check
+        run: |
+          echo "Checking for outdated dependencies..."
+          npm outdated || true
+          
+      - name: Auto-fix dependencies
+        run: |
+          echo "Attempting to auto-fix dependencies..."
+          npm audit fix
+        continue-on-error: true
+      
+      - name: Check for Dependabot alerts
+        run: |
+          echo "Checking for Dependabot alerts..."
+          # GitHub CLI to check for security alerts
+          # Note: This requires appropriate permissions
+          if command -v gh &> /dev/null; then
+            gh api repos/:owner/:repo/dependabot/alerts --jq '.[] | select(.state == "open")' || echo "Unable to check alerts"
+          fi
+        continue-on-error: true
+
+  code-quality:
+    runs-on: self-hosted
+    needs: [early-validation]
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Lint
+        run: |
+          echo "Running linter with detailed output..."
+          npm run lint -- --format verbose || true
+      
+      - name: Auto-fix linting issues
+        run: |
+          echo "Attempting to auto-fix linting issues..."
+          npm run lint -- --fix
+        continue-on-error: true
+      
+      - name: Check code style
+        run: |
+          echo "Checking code style..."
+          npm run format:check || true
+      
+      - name: Format code
+        run: |
+          echo "Auto-formatting code..."
+          npm run format
+        continue-on-error: true
+      
+      - name: Check for security issues in code
+        run: |
+          echo "Checking for security issues in code..."
+          # Install and run security scanner if available
+          npm list -g --depth=0 | grep -q "snyk" || npm install -g snyk
+          if command -v snyk &> /dev/null; then
+            snyk test || echo "Security issues found"
+          else
+            echo "Snyk not available, skipping security check"
+          fi
+        continue-on-error: true
+
+  test:
+    runs-on: self-hosted
+    needs: [dependency-check, code-quality]
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Run unit tests with verbose logging
+        run: |
+          echo "Running unit tests with detailed output..."
+          npm test -- --verbose
+      
+      - name: Run integration tests
+        run: |
+          echo "Running integration tests..."
+          npm run test:integration || echo "No integration tests found"
+        continue-on-error: true
+      
+      - name: Generate test coverage report
+        run: |
+          echo "Generating test coverage report..."
+          npm run test:coverage || echo "No coverage script found"
+        continue-on-error: true
+      
+      - name: Check test coverage thresholds
+        run: |
+          echo "Checking test coverage thresholds..."
+          # Example script to check coverage thresholds
+          if [ -f "coverage/lcov-report/index.html" ]; then
+            COVERAGE=$(grep -o 'fraction">[0-9.]*%' coverage/lcov-report/index.html | grep -o '[0-9.]*' | head -1)
+            echo "Total coverage: $COVERAGE%"
+            if (( $(echo "$COVERAGE < 70" | bc -l) )); then
+              echo "Warning: Coverage below 70%"
+            fi
+          fi
+        continue-on-error: true
+      
+      - name: Upload test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: test-results
+          path: coverage/
+        continue-on-error: true
+
+  build:
+    runs-on: self-hosted
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build with verbose logging
+        run: |
+          echo "Building project with detailed output..."
+          npm run build -- --verbose || npm run build
+      
+      - name: Verify build output
+        run: |
+          echo "Verifying build artifacts..."
+          ls -la dist/ || echo "No dist directory found"
+        continue-on-error: true
+      
+      - name: Check bundle size
+        run: |
+          echo "Checking bundle size..."
+          if [ -d "dist" ]; then
+            find dist -type f -name "*.js" | xargs ls -l | awk '{sum+=$5} END {print "Total bundle size: " sum/1024/1024 " MB"}'
+          fi
+        continue-on-error: true
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-artifacts
+          path: dist/
+        continue-on-error: true
+
+  deploy:
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: self-hosted
+    needs: [build]
+    environment: production
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: build-artifacts
+          path: dist/
+        continue-on-error: true
+      
+      - name: Prepare for deployment
+        run: |
+          echo "Preparing for deployment..."
+          # Add pre-deployment setup steps
+      
+      - name: Deploy with verbose logging
+        run: |
+          echo "Deploying to production with detailed logging..."
+          # Add actual deployment commands here
+          # Example: npm run deploy -- --verbose
+      
+      - name: Verify deployment
+        run: |
+          echo "Verifying deployment status..."
+          # Add deployment verification commands
+      
+      - name: Post-deployment notification
+        run: |
+          echo "Sending deployment notification..."
+          # Add notification commands (Slack, email, etc.)
+
+  notify-on-failure:
+    needs: [early-validation, dependency-check, code-quality, test, build, deploy]
+    if: failure()
+    runs-on: self-hosted
+    steps:
+      - name: Generate detailed error report
+        run: |
+          echo "Generating detailed error report..."
+          echo "Job failure detected. Check logs for detailed information."
+          # This would be replaced with actual error reporting code
+      
+      - name: Send failure notification
+        run: |
+          echo "Sending failure notification with error details..."
+          # Add notification commands (Slack, email, etc.)

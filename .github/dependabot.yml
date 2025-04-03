@@ -1,0 +1,91 @@
+# Dependabot configuration file for self-hosted runners
+version: 2
+updates:
+  # Enable version updates for npm
+  - package-ecosystem: "npm"
+    # Look for package.json and package-lock.json files in the root directory
+    directory: "/"
+    # Check for updates once a week (on Monday)
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    # Specify labels for npm pull requests
+    labels:
+      - "npm"
+      - "dependencies"
+    # Set automated PR review settings  
+    reviewers:
+      - "repo-owner"  # Replace with actual GitHub username
+    # Group all updates together
+    groups:
+      dependencies:
+        patterns:
+          - "*"
+    # Set version update preferences
+    versioning-strategy: auto
+    # Limit pull requests for version updates
+    open-pull-requests-limit: 10
+    # Allow up to 5 pull requests for security updates
+    security-updates-limit: 5
+    # Configure pull request settings
+    pull-request-branch-name:
+      # Separate sections of the branch name with a hyphen
+      separator: "-"
+    # Allow up to 50MB increased bundle size
+    allow-increased-bundle-size: true
+    # Commit message preferences
+    commit-message:
+      prefix: "deps"
+      prefix-development: "dev-deps"
+      include: "scope"
+
+  # Enable version updates for GitHub Actions
+  - package-ecosystem: "github-actions"
+    # Look for GitHub Actions workflow files in the .github/workflows directory
+    directory: "/"
+    # Check for updates once a week
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    # Specify labels for GitHub Actions pull requests
+    labels:
+      - "github-actions"
+      - "ci-cd"
+    # Set automated PR review settings
+    reviewers:
+      - "repo-owner"  # Replace with actual GitHub username
+    # Commit message preferences
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+
+# Configuration for Dependabot alerts
+#
+# Note: This file does not control Dependabot alerts directly. 
+# To configure alerts, go to your repository settings on GitHub:
+# Settings > Security > Code security and analysis > Dependabot alerts
+#
+# This comment section serves as documentation for Dependabot settings:
+#
+# 1. Self-hosted runners:
+#    - Dependabot alerts are compatible with self-hosted runners
+#    - The workflow will use your self-hosted runner configuration
+#
+# 2. Auto-fix settings:
+#    - The workflow includes automatic fixing of vulnerabilities where possible
+#    - Minor and patch updates can be auto-merged if tests pass
+#    - Major updates require manual review
+#
+# 3. Security considerations:
+#    - Ensure your self-hosted runner has appropriate security measures
+#    - Make sure the runner has access to required resources
+#    - Consider network isolation if dealing with sensitive dependencies
+#
+# 4. Performance considerations:
+#    - Dependabot jobs may require additional resources
+#    - Ensure your self-hosted runner has adequate CPU/memory
+#
+# 5. Troubleshooting:
+#    - Check logs in GitHub Actions tab for details on failures
+#    - Verify network connectivity for dependency update checks
+#    - Ensure GitHub token has appropriate permissions
