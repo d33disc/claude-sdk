@@ -51,7 +51,7 @@ class TestClaude(unittest.TestCase):
         
         # Check the payload
         args, kwargs = mock_post.call_args
-        payload = json.loads(kwargs["data"])
+        payload = kwargs["json"]
         
         self.assertEqual(payload["model"], "claude-3-7-sonnet-20250219")
         self.assertEqual(payload["max_tokens"], 100)
@@ -88,7 +88,7 @@ class TestClaude(unittest.TestCase):
         
         # Check the payload
         args, kwargs = mock_post.call_args
-        payload = json.loads(kwargs["data"])
+        payload = kwargs["json"]
         
         self.assertEqual(payload["model"], "claude-3-7-sonnet-20250219")
         self.assertEqual(payload["max_tokens"], 100)
