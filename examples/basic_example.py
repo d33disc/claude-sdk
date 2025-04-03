@@ -36,7 +36,7 @@ if os.environ.get("TESTING", "false").lower() == "true":
         
         # Generate a response
         response = client.generate(
-            model="claude-3-7-sonnet-20250219",
+            model=os.environ.get("CLAUDE_MODEL", "claude-3-7-sonnet-20250219"),
             prompt="What is the capital of France?"
         )
         
