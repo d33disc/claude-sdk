@@ -25,22 +25,24 @@ test_domain() {
     echo -e "${GREEN}SUCCESS${NC}"
     return 0
   else
-    # If curl fails, try basic TCP connection with netcat or telnet
     if command -v nc > /dev/null; then
       if nc -z -w 5 ${domain} ${port} 2>/dev/null; then
         echo -e "${YELLOW}PARTIAL SUCCESS${NC} (TCP connection works, but HTTPS failed)"
         return 1
+      else
+        echo -e "${RED}FAILED${NC} (nc failed)"
       fi
     elif command -v telnet > /dev/null; then
       if echo | telnet ${domain} ${port} 2>/dev/null | grep -q "Connected"; then
         echo -e "${YELLOW}PARTIAL SUCCESS${NC} (TCP connection works, but HTTPS failed)"
         return 1
+      else
+        echo -e "${RED}FAILED${NC} (telnet failed)"
       fi
+    else
+      echo -e "${RED}FAILED${NC} (nc and telnet not found)"
+      return 2
     fi
-    
-    echo -e "${RED}FAILED${NC}"
-    return 2
-  fi
 }
 
 # Core domains
