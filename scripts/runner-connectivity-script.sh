@@ -90,7 +90,7 @@ fi
 
 # Summarize results
 echo -e "\n===== Results Summary ====="
-TOTAL_TESTS=9
+TOTAL_TESTS=$(grep -c '^test_domain' $0)
 FAILED_TESTS=0
 
 if [ $GITHUB_STATUS -gt 0 ]; then FAILED_TESTS=$((FAILED_TESTS+1)); fi
