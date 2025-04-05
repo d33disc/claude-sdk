@@ -5,7 +5,7 @@
 # Set variables
 GITHUB_REPO="https://github.com/d33disc/claude-sdk"
 GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" # Store in GitHub Actions secrets
-RUNNER_DIR="/Users/chrisdavis/actions-runner/actions-runner"
+RUNNER_DIR="${RUNNER_DIR:-/path/to/default/runner}" # Allow user to override with env var
 
 # Check if runner directory exists
 if [ ! -d "$RUNNER_DIR" ]; then
