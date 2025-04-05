@@ -4,7 +4,7 @@
 
 # Set variables
 GITHUB_REPO="https://github.com/d33disc/claude-sdk"
-GITHUB_TOKEN="BAHFVMKV4WLAHDK6HH2AXX3H5332G"
+GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}" # Store in GitHub Actions secrets
 RUNNER_DIR="/Users/chrisdavis/actions-runner/actions-runner"
 
 # Check if runner directory exists
