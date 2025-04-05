@@ -26,6 +26,6 @@ if [ $? -eq 0 ]; then
     # Run the runner
     ./run.sh
 else
-    echo "Configuration failed. Please check your repository URL and token."
+echo "Configuration failed. Please check your repository URL and token.  Error code: $?"
     exit 1
 fi
