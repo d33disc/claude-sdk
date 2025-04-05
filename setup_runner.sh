@@ -18,7 +18,7 @@ cd "$RUNNER_DIR"
 
 # Configure the runner
 echo "Configuring GitHub Actions runner..."
-./config.sh --url "$GITHUB_REPO" --token "$GITHUB_TOKEN"
+./config.sh -n --url "$GITHUB_REPO" --token "$GITHUB_TOKEN"
 
 # Check if configuration was successful
 if [ $? -eq 0 ]; then
